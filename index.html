@@ -4770,13 +4770,13 @@ const WARMUS=(function(){
   try{const o=JSON.parse(localStorage.getItem('rp3_mus')||'null');if(o){cfg.on=o.on!==false;if(typeof o.vol==='number')cfg.vol=Math.max(0,Math.min(1,o.vol))}}catch(e){}
   const save=()=>{try{localStorage.setItem('rp3_mus',JSON.stringify(cfg))}catch(e){}};
   const cands=['musica/guerra.mp3','musica/guerra.ogg','musica/guerra.m4a'];
-  let a=null,userUrl=null,userName='',tried=0,state='idle';
+  let a=null,userUrl=null,defUrl=null,userName='',tried=0,state='idle';
   function ensure(){
     if(a)return a;
     a=new Audio();a.loop=true;a.preload='none';a.volume=cfg.vol;
     a.addEventListener('error',()=>{if(userUrl){state='erro';return}tried++;if(tried<cands.length){a.src=cands[tried]}else state='nenhuma'});
     a.addEventListener('playing',()=>{state='tocando'});a.addEventListener('pause',()=>{if(state==='tocando')state='pausada'});
-    a.src=userUrl||cands[0];return a;
+    a.src=userUrl||defUrl||cands[0];return a;
   }
   const want=()=>!!(S&&S.war&&S.war.active&&cfg.on&&SND.cfg.on&&!document.hidden);
   function sync(){
@@ -4796,9 +4796,20 @@ const WARMUS=(function(){
     if(a){a.src=userUrl}sync();return true;
   }
   async function clear(){try{await IDB.del('war')}catch(e){}if(userUrl)URL.revokeObjectURL(userUrl);userUrl=null;userName='';tried=0;state='idle';if(a){a.pause();a.src=cands[0]}}
-  return {cfg,sync,loadUser,setFile,clear,
+  // guarda a marcha padrão no aparelho (IndexedDB) na primeira vez com internet; depois toca offline, sem depender do cache do navegador
+  async function loadDefault(){
+    try{
+      const b=await IDB.get('wardef');
+      if(b&&b.blob){defUrl=URL.createObjectURL(b.blob);if(a&&!userUrl)a.src=defUrl;return}
+      if(navigator.onLine===false)return;
+      const r=await fetch(cands[0]);if(!r.ok)return;const blob=await r.blob();
+      if(blob.size<100000)return;
+      await IDB.set('wardef',{blob,name:'guerra.mp3'});defUrl=URL.createObjectURL(blob);if(a&&!userUrl)a.src=defUrl;
+    }catch(e){}
+  }
+  return {cfg,sync,loadUser,loadDefault,setFile,clear,
     setOn(v){cfg.on=!!v;save();sync()},setVol(v){cfg.vol=Math.max(0,Math.min(1,v));save();if(a)a.volume=cfg.vol},
-    status(){return userUrl?'Tocando: '+userName:state==='nenhuma'?'Nenhum arquivo encontrado. Escolha uma música do seu aparelho ou coloque musica/guerra.mp3 ao lado do jogo.':'Usando musica/guerra.mp3 (marcha de Sousa, domínio público).'},
+    status(){return userUrl?'Tocando: '+userName:defUrl?'Marcha de Sousa guardada no aparelho (toca mesmo sem internet).':state==='nenhuma'?'Nenhum arquivo encontrado. Escolha uma música do seu aparelho ou coloque musica/guerra.mp3 ao lado do jogo.':'Usando musica/guerra.mp3 (marcha de Sousa, domínio público).'},
     hasUser:()=>!!userUrl,test(){try{const el=ensure();el.currentTime=0;const p=el.play();if(p&&p.catch)p.catch(()=>{});setTimeout(()=>{if(!want()&&a)a.pause()},6000)}catch(e){}}};
 })();
 function musicCard(){
@@ -5542,7 +5553,7 @@ window.addEventListener('orientationchange',()=>{setTimeout(()=>{try{applyDevice
 try{applyDevice()}catch(e){}
 (function boot(){
   UI.modeDefault=store.get('rp3_mode')||'pro';
-  try{WARMUS.loadUser()}catch(e){}
+  try{WARMUS.loadUser().then(()=>WARMUS.loadDefault())}catch(e){}
   const cur=store.get('rp3_cur');
   if(cur&&loadGame(cur)){render();if(S.ev.pending)showEvent()}else render();
 })();
