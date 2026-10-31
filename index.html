@@ -5511,7 +5511,8 @@ function detectDevice(){
   const phone=/iPhone|iPod|Android.*Mobile|Windows Phone|Mobile/i.test(ua);
   const tablet=ipad||(/Android/i.test(ua)&&!/Mobile/i.test(ua))||/Tablet|Silk|Kindle/i.test(ua);
   const small=Math.min(screen.width||9999,screen.height||9999)<=820;
-  return phone||(touch&&small)?'phone':tablet||(touch&&Math.min(screen.width||0,screen.height||0)<=1100)?'tablet':'desktop';
+  if(tablet)return 'tablet';
+  return phone||(touch&&small)?'phone':(touch&&Math.min(screen.width||0,screen.height||0)<=1100)?'tablet':'desktop';
 }
 // copia as regras do layout de celular (max-width:900px) para uma versão ativada pelo atributo html[data-compact], usada em tablets largos
 function cloneCompactCss(){
