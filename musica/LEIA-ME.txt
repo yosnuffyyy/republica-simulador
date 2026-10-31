@@ -1,0 +1,8 @@
+MÚSICA DE GUERRA
+
+O jogo nao traz musica. Para ter trilha sonora durante as guerras:
+
+1) Coloque aqui um arquivo chamado  guerra.mp3  (ou guerra.ogg / guerra.m4a), OU
+2) Dentro do jogo, abra Configuracoes > Musica de guerra > Escolher musica e selecione um arquivo do seu aparelho (funciona no celular tambem).
+
+So use musicas que voce tenha direito de usar (dominio publico, licenca livre ou suas).
