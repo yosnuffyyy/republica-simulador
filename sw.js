@@ -1,6 +1,6 @@
 /* Service worker: guarda o jogo no aparelho para abrir sem internet.
    Páginas (index.html) usam rede primeiro, para você sempre receber a versão mais nova; sem internet, usa a cópia guardada. */
-const V = 'republica-v14';
+const V = 'republica-v15';
 const FILES = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', e => {

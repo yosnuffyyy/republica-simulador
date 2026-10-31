@@ -3441,7 +3441,7 @@ function warWeek(s,flash){
 }
 /* ============ SOM (sintetizado com WebAudio: sem arquivos, funciona offline) ============ */
 const SND=(function(){
-  let ctx=null,master=null,K=null,unlocked=false;const last={};
+  let ctx=null,master=null,K=null,unlocked=false,primed=false,keep=null;const last={};
   const cfg={on:true,vol:.7};
   try{const o=JSON.parse(localStorage.getItem('rp3_snd')||'null');if(o){cfg.on=o.on!==false;if(typeof o.vol==='number')cfg.vol=Math.max(0,Math.min(1,o.vol))}}catch(e){}
   function save(){try{localStorage.setItem('rp3_snd',JSON.stringify(cfg))}catch(e){}}
@@ -3512,13 +3512,25 @@ const SND=(function(){
       if(!cfg.on||!unlocked||!R[name])return;
       const now=Date.now();if(last[name]&&now-last[name]<70)return;last[name]=now;
       if(!ensure())return;
-      if(ctx.state==='suspended'&&ctx.resume)ctx.resume();
+      if(ctx.state!=='running'&&ctx.resume)ctx.resume();
       R[name](K,ctx.currentTime+.01+(delay||0));
     }catch(e){}
   }
   return {
     cfg,names:Object.keys(R),play,
-    unlock(){unlocked=true},
+    // desbloqueio para celular: precisa rodar dentro de um toque. Cria/retoma o AudioContext, toca um instante de silêncio,
+    // pede ao iOS o canal de "reprodução" (som sai mesmo com o botão de silencioso) e mantém um áudio mudo para o sistema não suspender.
+    unlock(){
+      unlocked=true;
+      try{if(navigator.audioSession&&navigator.audioSession.type!=='playback')navigator.audioSession.type='playback'}catch(e){}
+      try{
+        if(!ensure())return;
+        if(ctx.state!=='running'&&ctx.resume)ctx.resume();
+        if(!primed){primed=true;const b=ctx.createBuffer(1,1,22050),s=ctx.createBufferSource();s.buffer=b;s.connect(ctx.destination);s.start(0);
+          try{const au=new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=');au.loop=true;au.volume=.01;au.setAttribute('playsinline','');const p=au.play();if(p&&p.catch)p.catch(()=>{});keep=au}catch(e){}
+          ctx.onstatechange=()=>{if(ctx.state!=='running'&&ctx.state!=='closed'&&ctx.resume&&unlocked)try{ctx.resume()}catch(e){}}}
+      }catch(e){}
+    },
     setOn(v){cfg.on=!!v;save()},
     setVol(v){cfg.vol=Math.max(0,Math.min(1,v));if(master)master.gain.value=cfg.vol;save()},
     // renderiza o som sem tocar (usado nos testes): devolve pico e energia
@@ -4807,7 +4819,9 @@ const WARMUS=(function(){
       await IDB.set('wardef',{blob,name:'guerra.mp3'});defUrl=URL.createObjectURL(blob);if(a&&!userUrl)a.src=defUrl;
     }catch(e){}
   }
-  return {cfg,sync,loadUser,loadDefault,setFile,clear,
+  let mprimed=false;
+  function prime(){if(mprimed)return;mprimed=true;try{const el=ensure();const m=el.muted;el.muted=true;const p=el.play();if(p&&p.then)p.then(()=>{el.pause();el.muted=m;try{el.currentTime=0}catch(e){}if(want())sync()}).catch(()=>{el.muted=m;mprimed=false});else el.muted=m}catch(e){}}
+  return {cfg,prime,sync,loadUser,loadDefault,setFile,clear,
     setOn(v){cfg.on=!!v;save();sync()},setVol(v){cfg.vol=Math.max(0,Math.min(1,v));save();if(a)a.volume=cfg.vol},
     status(){return userUrl?'Tocando: '+userName:defUrl?'Marcha de Sousa guardada no aparelho (toca mesmo sem internet).':state==='nenhuma'?'Nenhum arquivo encontrado. Escolha uma música do seu aparelho ou coloque musica/guerra.mp3 ao lado do jogo.':'Usando musica/guerra.mp3 (marcha de Sousa, domínio público).'},
     hasUser:()=>!!userUrl,test(){try{const el=ensure();el.currentTime=0;const p=el.play();if(p&&p.catch)p.catch(()=>{});setTimeout(()=>{if(!want()&&a)a.pause()},6000)}catch(e){}}};
@@ -5503,7 +5517,8 @@ document.addEventListener('change',ev=>{
    case 'war-cn':UI.war_cn=el.value;render();break;
   }
 });
-['pointerdown','keydown','touchstart'].forEach(n=>document.addEventListener(n,()=>{SND.unlock();try{WARMUS.sync()}catch(e){}},{capture:true,passive:true}));
+['pointerdown','pointerup','touchstart','touchend','click','keydown'].forEach(n=>document.addEventListener(n,()=>{SND.unlock();try{WARMUS.sync();WARMUS.prime()}catch(e){}},{capture:true,passive:true}));
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){try{SND.unlock()}catch(e){}}});
 document.addEventListener('input',ev=>{
   const el=ev.target;
   if(el.dataset&&el.dataset.in==='mus-vol'){WARMUS.setVol(Number(el.value)/100);const v=$('#musv');if(v)v.textContent=Math.round(Number(el.value))+'%';return}
