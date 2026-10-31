@@ -1,5 +1,5 @@
 /* Service worker: guarda o jogo no aparelho para abrir sem internet. */
-const V = 'republica-v11';
+const V = 'republica-v12';
 const FILES = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', e => {
